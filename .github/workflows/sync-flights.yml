@@ -52,7 +52,9 @@ jobs:
               updated_at: new Date().toISOString()
             });
 
-            const url = new URL("/rest/v1/dashboard_config?metric_key=eq.total_active_flights", process.env.SUPABASE_URL);
+            const cleanBase = process.env.SUPABASE_URL.trim().replace(/\/$/, "");
+            const fullUrl = `${cleanBase}/rest/v1/dashboard_config?metric_key=eq.total_active_flights`;
+            const url = new URL(fullUrl);
             
             const options = {
               hostname: url.hostname,
