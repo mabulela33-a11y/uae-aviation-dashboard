@@ -5,7 +5,8 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://stdxueftoewwnhbqncbo.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const AVIATIONSTACK_KEY = process.env.AVIATIONSTACK_KEY;
-const HUBS = ["DXB", "AUH", "SHJ", "DWC"];
+// Free plan = 100 requests/month: 3 hubs x 1 run/day = ~90/month. Add a hub only with a paid plan.
+const HUBS = ["DXB", "AUH", "SHJ"];
 
 if (!SUPABASE_SERVICE_KEY || !AVIATIONSTACK_KEY) {
   console.error("Missing secret: SUPABASE_SERVICE_KEY and AVIATIONSTACK_KEY must both be set in the repo's Actions secrets.");
@@ -46,7 +47,7 @@ async function main() {
   }
 
   const total = HUBS.reduce((sum, h) => sum + (counts[h] || 0), 0);
-  console.log(`Airborne inbound — DXB: ${counts.DXB}, AUH: ${counts.AUH}, SHJ: ${counts.SHJ}, DWC: ${counts.DWC}, total: ${total}`);
+  console.log(`Airborne inbound — ${HUBS.map((h) => `${h}: ${counts[h]}`).join(", ")}, total: ${total}`);
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/dashboard_config?id=eq.1`, {
     method: "PATCH",
@@ -61,7 +62,6 @@ async function main() {
       live_dxb: counts.DXB,
       live_auh: counts.AUH,
       live_shj: counts.SHJ,
-      live_dwc: counts.DWC,
       live_updated_at: new Date().toISOString(),
     }),
   });

@@ -2,7 +2,7 @@ name: Sync UAE Aviation Data
 
 on:
   schedule:
-    - cron: '0 0,12 * * *'   # 04:00 and 16:00 UAE time
+    - cron: '0 8 * * *'   # once a day, 12:00 UAE time (fits the 100-request free plan)
   workflow_dispatch:
 
 jobs:
