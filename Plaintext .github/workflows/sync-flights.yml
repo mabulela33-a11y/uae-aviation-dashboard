@@ -1,9 +1,11 @@
-name: Sync UAE Aviation Data
+ name: Sync UAE Aviation Data
 
 on:
+  push:
+    branches: [ main ]
   schedule:
-    - cron: '0 0,12 * * *' # Runs automatically every 12 hours
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
 
 jobs:
   sync-flight-data:
