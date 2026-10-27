@@ -103,6 +103,52 @@
                     <canvas id="flight-canvas"></canvas>
                 </div>
             </div>
+
+            <!-- Weekly flights & passengers -->
+            <div id="weeklyPanel" class="glass-card p-5 rounded-2xl flex flex-col gap-4">
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-week text-cyan-glow"></i> WEEKLY FLIGHTS &amp; PASSENGERS
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Airports don't publish weekly figures. Below: weekly averages worked out from official totals, and flights counted each week from tracking data.</p>
+                </div>
+
+                <div>
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">From official figures (averages per week)</div>
+                    <div class="overflow-x-auto rounded-lg border border-slate-800">
+                        <table class="w-full text-left text-xs text-slate-300 tnum">
+                            <thead class="bg-navy-900 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                                <tr><th class="p-2">Airport</th><th class="p-2">Period</th><th class="p-2 text-right">Flights / week</th><th class="p-2 text-right">Passengers / week</th><th class="p-2">Type</th></tr>
+                            </thead>
+                            <tbody id="weeklyOfficialBody" class="divide-y divide-slate-800/50 text-[11px]"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tracked each week (OpenSky Network)</div>
+                        <div id="trackedNote" class="text-[10px] text-slate-500"></div>
+                    </div>
+                    <div id="trackedEmpty" class="p-4 rounded-xl border border-dashed border-slate-700 text-xs text-slate-400">
+                        Weekly counts start after the OpenSky account is connected. Each Tuesday, last week's arrivals and departures at DXB, AUH, SHJ and RAK are counted and appear here.
+                    </div>
+                    <div id="trackedContent" class="hidden flex flex-col gap-3">
+                        <div class="relative w-full h-[220px] bg-navy-900/60 rounded-xl p-3 border border-slate-800/80">
+                            <canvas id="weeklyChart" aria-label="Tracked flights per week by airport"></canvas>
+                        </div>
+                        <div class="overflow-x-auto rounded-lg border border-slate-800">
+                            <table class="w-full text-left text-xs text-slate-300 tnum">
+                                <thead class="bg-navy-900 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                                    <tr><th class="p-2">Week of</th><th class="p-2">Airport</th><th class="p-2 text-right">Arrivals</th><th class="p-2 text-right">Departures</th><th class="p-2 text-right">Flights</th><th class="p-2 text-right">Est. passengers</th></tr>
+                                </thead>
+                                <tbody id="trackedBody" class="divide-y divide-slate-800/50 text-[11px]"></tbody>
+                            </table>
+                        </div>
+                        <p class="text-[10px] text-slate-500">Tracked flights only include aircraft OpenSky's receivers picked up, so they can run below the real total. Estimated passengers = flights × each airport's official passengers per flight (DXB 209, AUH 186, SHJ 167; none for RAK).</p>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="lg:col-span-4 flex flex-col gap-5 min-w-0">
@@ -216,12 +262,14 @@
         }
         async function loadData() {
             try {
-                const [traffic, markets, cfg] = await Promise.all([
+                const [traffic, markets, cfg, weekly, tracked] = await Promise.all([
                     sbSelect('official_traffic', 'select=*'),
                     sbSelect('top_markets', 'select=*'),
-                    sbSelect('dashboard_config', 'select=live_active_flights,live_updated_at&id=eq.1')
+                    sbSelect('dashboard_config', 'select=live_active_flights,live_updated_at&id=eq.1'),
+                    sbSelect('weekly_figures', 'select=*&order=sort_order.asc'),
+                    sbSelect('tracked_weekly', 'select=*&order=week_start.desc&limit=104')
                 ]);
-                applyData({ traffic, markets, config: cfg[0] || {} });
+                applyData({ traffic, markets, config: cfg[0] || {}, weekly, tracked });
                 setStatus('fa-circle-check', 'text-emerald-400', 'Live from Supabase');
             } catch (err) {
                 console.warn('Supabase read failed, showing saved copy:', err);
@@ -301,6 +349,20 @@
             M(2026,'Q1','London','EU',0.752,false,S.dmoQ1,'city'), M(2026,'Q1','Mumbai','IND',0.52,false,S.dmoQ1,'city'),
             M(2026,'Q1','Jeddah','ME',0.505,false,S.dmoQ1,'city')
         ];
+        const W = (airport, year, label, method, flights, pax, basis, sort_order, src) =>
+            ({ airport, year, label, method, flights_per_week: flights, passengers_per_week: pax, basis, sort_order, source_title: src[0], source_url: src[1] });
+        let WEEKLY = [
+            W('DXB',2025,'2025 full year','official_average',8722,1825753,'454,800 flights and 95.2m passengers over 365 days',10,S.dmo25),
+            W('DXB',2026,'Jan–Jun 2026','official_average',5824,1218232,'150,600 flights and 31.5m passengers over 181 days',20,S.dmoH1),
+            W('DXB',2026,'Apr–Jun 2026','official_average',4808,1000000,'Q2: 62,500 flights and 13.0m passengers over 91 days',30,S.dmoH1),
+            W('DXB',2026,'June 2026','official_average',null,1166667,'5.0m passengers in June (30 days); flights not published for June',40,S.dmoH1),
+            W('DXB',2026,'Jul–Dec 2026 (expected)','operator_forecast',7003,1464674,'Operator forecast ~70m for 2026 minus 31.5m already reached, over 184 days; flights = passengers ÷ 209 (H1 2026 passengers per flight)',50,S.tn26),
+            W('AUH',2026,'Late June 2026','operator_statement',3500,651000,'Operator: over 93,000 passengers and close to 500 flights a day (26–30 June average)',60,['Gulf Business — Daily passenger traffic exceeds 2025 levels at Zayed International','https://gulfbusiness.com/en/2026/aviation/daily-passenger-traffic-exceeds-2025-levels-at-zayed-international-abu-dhabi-airports/']),
+            W('SHJ',2025,'2025 full year','official_average',2237,373589,'116,657 flights and 19.48m passengers over 365 days',70,S.gnSH),
+            W('SHJ',2026,'Jul–Aug 2026 (expected)','operator_forecast',2145,338710,'Operator forecast: ~3m passengers and ~19,000 flights over July–August (62 days)',80,['Gulf Today — Sharjah Airport ready to welcome approximately 3 million passengers during peak summer','https://www.gulftoday.ae/business/2026/07/07/sharjah-airport-ready-to-welcome-approximately-3-million-passengers-during-peak-summer-travel-season'])
+        ];
+        let TRACKED = [];
+        let weeklyChart = null;
         let LIVE = {};
 
         // --- 1. STATIC GEOGRAPHY ---
@@ -345,7 +407,11 @@
         const periodLabel = p => ({ FY: 'Full year', H1: 'Jan–Jun', '9M': 'Jan–Sep', Q1: 'Q1', Q2: 'Q2', Q3: 'Q3', Q4: 'Q4' }[p] || p);
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-        function applyData({ traffic, markets, config }) {
+        function applyData({ traffic, markets, config, weekly, tracked }) {
+            if (Array.isArray(weekly) && weekly.length)
+                WEEKLY = weekly.map(r => ({ ...r, flights_per_week: num(r.flights_per_week), passengers_per_week: num(r.passengers_per_week) }));
+            if (Array.isArray(tracked))
+                TRACKED = tracked.map(r => ({ ...r, arrivals: num(r.arrivals), departures: num(r.departures), movements: num(r.movements), est_passengers: num(r.est_passengers), days_ok: num(r.days_ok) }));
             if (Array.isArray(traffic) && traffic.length)
                 TRAFFIC = traffic.map(r => ({ ...r, year: Number(r.year), passengers_m: num(r.passengers_m), movements: num(r.movements), yoy_pct: num(r.yoy_pct) }));
             if (Array.isArray(markets) && markets.length)
@@ -353,6 +419,7 @@
             LIVE = config || {};
             renderLive();
             renderDashboard();
+            renderWeekly();
             if (!document.getElementById('trendModal').classList.contains('hidden')) renderModal();
         }
 
@@ -371,6 +438,7 @@
             initCanvas();
             initChart();
             setYear(2025);
+            renderWeekly();
             loadData();
             window.addEventListener('resize', () => { resizeCanvas(); drawFlightPaths(); });
             window.addEventListener('keydown', e => { if (e.key === 'Escape') closeTrendModal(); });
@@ -683,6 +751,69 @@
                     <span class="text-slate-200 font-semibold"><i class="fa-solid fa-city text-slate-500 mr-1.5"></i>${esc(c.country)}</span>
                     <span class="tnum text-cyan-200 font-bold">${fmtM(c.passengers_m, c.approx)} <a class="src text-[10px] font-normal ml-1" href="${esc(c.source_url)}" target="_blank" rel="noopener">Source</a></span>
                 </div>`).join('') : '');
+        }
+
+        // --- 7b. WEEKLY ---
+        const METHOD_LABEL = {
+            official_average: ['Official average', 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'],
+            operator_statement: ['Operator statement', 'bg-sky-500/15 text-sky-300 border-sky-500/30'],
+            operator_forecast: ['Operator forecast', 'bg-slate-600/40 text-slate-200 border-slate-500/40']
+        };
+        const fmtPax = v => v == null ? '—' : v >= 1e6 ? `${(v / 1e6).toFixed(2)}m` : `${Math.round(v / 1000).toLocaleString('en-US')}k`;
+
+        function renderWeekly() {
+            document.getElementById('weeklyOfficialBody').innerHTML = [...WEEKLY].sort((a, b) => a.sort_order - b.sort_order).map(r => {
+                const [label, cls] = METHOD_LABEL[r.method] || [r.method, ''];
+                return `<tr class="align-top">
+                    <td class="p-2 font-bold text-white">${esc(r.airport)}</td>
+                    <td class="p-2 whitespace-nowrap">${esc(r.label)}</td>
+                    <td class="p-2 text-right text-cyan-200 font-bold">${fmtInt(r.flights_per_week)}</td>
+                    <td class="p-2 text-right text-cyan-200 font-bold">${fmtPax(r.passengers_per_week)}</td>
+                    <td class="p-2 min-w-[200px]"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${cls}">${label}</span>
+                        <div class="text-[10px] text-slate-500 mt-1">${esc(r.basis)} · <a class="src" href="${esc(r.source_url)}" target="_blank" rel="noopener">Source</a></div></td>
+                </tr>`;
+            }).join('');
+
+            const has = TRACKED.length > 0;
+            document.getElementById('trackedEmpty').classList.toggle('hidden', has);
+            document.getElementById('trackedContent').classList.toggle('hidden', !has);
+            if (!has) { document.getElementById('trackedNote').textContent = ''; return; }
+
+            const weeks = [...new Set(TRACKED.map(r => r.week_start))].sort().slice(-12);
+            const latest = weeks[weeks.length - 1];
+            const fetched = TRACKED.filter(r => r.week_start === latest).map(r => r.fetched_at).sort().pop();
+            document.getElementById('trackedNote').textContent = `Latest week: ${latest}${fetched ? ` · updated ${new Date(fetched).toLocaleDateString()}` : ''}`;
+
+            const order = ['DXB', 'AUH', 'SHJ', 'RAK'];
+            const rowsFor = w => TRACKED.filter(r => r.week_start === w).sort((a, b) => order.indexOf(a.airport) - order.indexOf(b.airport));
+            const datasets = order.map(a => ({
+                label: a,
+                data: weeks.map(w => TRACKED.find(r => r.week_start === w && r.airport === a)?.movements ?? null),
+                backgroundColor: AIRPORTS[a].color, borderRadius: 4, stack: 'flights'
+            }));
+            if (weeklyChart) weeklyChart.destroy();
+            weeklyChart = new Chart(document.getElementById('weeklyChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: weeks.map(w => w.slice(5)), datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#e2e8f0', font: { family: 'Inter', size: 11 } } },
+                        tooltip: { callbacks: { title: i => `Week of ${weeks[i[0].dataIndex]}`, label: c => ` ${c.dataset.label}: ${fmtInt(c.raw)} flights` } } },
+                    scales: {
+                        x: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: 'Tracked flights', color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            document.getElementById('trackedBody').innerHTML = [...weeks].reverse().slice(0, 4).flatMap(w => rowsFor(w).map(r => `<tr>
+                <td class="p-2 whitespace-nowrap">${esc(r.week_start)}${r.days_ok < 7 ? ` <span class="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-300" title="Only ${r.days_ok} of 7 days had data">PARTIAL ${r.days_ok}/7</span>` : ''}</td>
+                <td class="p-2 font-bold text-white">${esc(r.airport)}</td>
+                <td class="p-2 text-right">${fmtInt(r.arrivals)}</td>
+                <td class="p-2 text-right">${fmtInt(r.departures)}</td>
+                <td class="p-2 text-right text-cyan-200 font-bold">${fmtInt(r.movements)}</td>
+                <td class="p-2 text-right">${r.est_passengers != null ? '≈' + fmtPax(r.est_passengers) : '—'}</td>
+            </tr>`)).join('');
         }
 
         // --- 8. DETAIL MODAL ---

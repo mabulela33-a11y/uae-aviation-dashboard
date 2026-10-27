@@ -1,0 +1,32 @@
+name: Weekly UAE flight counts
+
+on:
+  schedule:
+    - cron: '0 6 * * 2'   # Tuesdays 10:00 UAE time, after OpenSky has processed the previous week
+  workflow_dispatch:
+    inputs:
+      weeks_back:
+        description: 'How many past weeks to count (1–8)'
+        required: false
+        default: '1'
+
+jobs:
+  count-flights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Count last week's flights and save to Supabase
+        env:
+          OPENSKY_CLIENT_ID: ${{ secrets.OPENSKY_CLIENT_ID }}
+          OPENSKY_CLIENT_SECRET: ${{ secrets.OPENSKY_CLIENT_SECRET }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          WEEKS_BACK: ${{ github.event.inputs.weeks_back || '1' }}
+        run: node scripts/weekly-flights.js
