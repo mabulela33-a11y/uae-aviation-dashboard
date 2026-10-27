@@ -14,6 +14,10 @@ const CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
 const TOKEN_URL = process.env.OPENSKY_TOKEN_URL ||
   "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 const API = "https://opensky-network.org/api";
+// Show errors and warnings as GitHub Actions annotations (visible on the run summary)
+const _err = console.error.bind(console), _warn = console.warn.bind(console);
+console.error = (...a) => _err(`::error::${a.join(" ")}`);
+console.warn = (...a) => _warn(`::warning::${a.join(" ")}`);
 const WEEKS_BACK = Math.min(Math.max(parseInt(process.env.WEEKS_BACK || "1", 10) || 1, 1), 8);
 
 // Passengers per flight (movement) from official figures; null = no official basis
