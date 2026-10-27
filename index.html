@@ -252,6 +252,7 @@
             ktH1: ['Khaleej Times — Sharjah Airport welcomes 9.11 million passengers in H1 2025', 'https://www.khaleejtimes.com/business/aviation/uae-sharjah-airport-passengers-traffic-travel'],
             gnSH: ['Gulf News — Sharjah Airport passenger traffic jumps 14% to 19.4 million in 2025', 'https://gulfnews.com/business/aviation/sharjah-airport-passenger-traffic-jumps-14-to-194-million-in-2025-1.500415844'],
             kt25: ['Khaleej Times — How Ras Al Khaimah airport expanded international flights to 16 countries in 2025', 'https://www.khaleejtimes.com/uae/ras-al-khaimah-international-airport-flights-expansion-2025'],
+            dmo25: ['Dubai Media Office — DXB sets new global record (official)', 'https://mediaoffice.ae/en/news/2026/february/11-02/dxb-sets-new-global'],
             td25: ['TravelDailyNews — Dubai International records 95.2m passengers in 2025', 'https://www.traveldailynews.com/aviation/dubai-international-records-95-2m-passengers-in-2025/']
         };
         const auhNote = 'Reported as "Abu Dhabi"; likely includes the group\'s smaller airports (9M + Q4 exceeds Zayed\'s 32.5m full year)';
@@ -263,8 +264,8 @@
             T('DXB',2025,'H1','actual',46.0,null,2.3,false,null,S.gnH1),
             T('DXB',2025,'Q3','actual',24.2,null,1.9,false,null,S.ab9M),
             T('DXB',2025,'9M','actual',70.1,null,null,false,null,S.ab9M),
-            T('DXB',2025,'Q4','actual',25.1,118000,null,false,'Busiest quarter on record; December 8.7m passengers',S.gnFY),
-            T('DXB',2025,'FY','actual',95.2,454800,3.1,false,'Load factor 77.6%',S.gnFY),
+            T('DXB',2025,'Q4','actual',25.1,118000,5.9,false,'Busiest quarter on record; December 8.7m (+6.1%); flights +5%',S.dmo25),
+            T('DXB',2025,'FY','actual',95.2,454800,3.1,false,'Flights +3.3%; load factor 77.6%',S.dmo25),
             T('DXB',2026,'Q1','actual',18.6,88000,null,true,'UAE airspace restrictions from 28 Feb 2026',S.anQ1),
             T('DXB',2026,'Q2','actual',13.0,62500,-42,false,'April 3.5m, May 4.5m, June 5.0m',S.zwH1),
             T('DXB',2026,'H1','actual',31.5,150600,-31.3,false,'Movements -32.1% YoY',S.zwH1),
@@ -284,15 +285,15 @@
         const M = (year, period, country, region, pax, approx, src, market_type = 'country', yoy = null) =>
             ({ airport: 'DXB', year, period, country, region, passengers_m: pax, approx, market_type, yoy_pct: yoy, source_title: src[0], source_url: src[1] });
         let MARKETS = [
-            M(2025,'FY','India','IND',11.9,false,S.gnFY), M(2025,'FY','Saudi Arabia','ME',7.5,false,S.gnFY),
-            M(2025,'FY','United Kingdom','EU',6.3,false,S.gnFY), M(2025,'FY','Pakistan','IND',4.3,false,S.gnFY),
-            M(2025,'FY','United States','AMER',3.3,false,S.gnFY),
-            M(2025,'FY','Russia','CIS',2.8,false,S.td25,'country',6), M(2025,'FY','China','ASIA',2.5,false,S.td25,'country',16.6),
-            M(2025,'FY','Turkey','EU',2.2,false,S.td25,'country',6.7), M(2025,'FY','Egypt','AFR',1.8,false,S.td25,'country',14.3),
-            M(2025,'FY','Italy','EU',1.6,false,S.td25,'country',12.5),
-            M(2025,'FY','London','EU',3.9,false,S.td25,'city'), M(2025,'FY','Riyadh','ME',3.0,false,S.td25,'city'),
-            M(2025,'FY','Mumbai','IND',2.4,false,S.td25,'city'), M(2025,'FY','Jeddah','ME',2.4,false,S.td25,'city'),
-            M(2025,'FY','New Delhi','IND',2.2,false,S.td25,'city'),
+            M(2025,'FY','India','IND',11.9,false,S.dmo25), M(2025,'FY','Saudi Arabia','ME',7.5,false,S.dmo25),
+            M(2025,'FY','United Kingdom','EU',6.3,false,S.dmo25), M(2025,'FY','Pakistan','IND',4.3,false,S.dmo25),
+            M(2025,'FY','United States','AMER',3.3,false,S.dmo25),
+            M(2025,'FY','Russia','CIS',2.8,false,S.dmo25,'country',6), M(2025,'FY','China','ASIA',2.5,false,S.dmo25,'country',16.6),
+            M(2025,'FY','Turkey','EU',2.2,false,S.dmo25,'country',6.7), M(2025,'FY','Egypt','AFR',1.8,false,S.dmo25,'country',14.3),
+            M(2025,'FY','Italy','EU',1.6,false,S.dmo25,'country',12.5),
+            M(2025,'FY','London','EU',3.9,false,S.dmo25,'city'), M(2025,'FY','Riyadh','ME',3.0,false,S.dmo25,'city'),
+            M(2025,'FY','Mumbai','IND',2.4,false,S.dmo25,'city'), M(2025,'FY','Jeddah','ME',2.4,false,S.dmo25,'city'),
+            M(2025,'FY','New Delhi','IND',2.2,false,S.dmo25,'city'),
             M(2026,'Q1','India','IND',2.5,true,S.anQ1), M(2026,'Q1','Saudi Arabia','ME',1.3,true,S.anQ1),
             M(2026,'Q1','United Kingdom','EU',1.2,true,S.anQ1)
         ];
