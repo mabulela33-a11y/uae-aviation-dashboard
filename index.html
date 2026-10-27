@@ -111,11 +111,11 @@
                 <div class="flex items-start justify-between gap-2 mb-3">
                     <div>
                         <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-cyan-glow"></i> PASSENGER SHARE BY AIRPORT
+                            <i class="fa-solid fa-chart-pie text-cyan-glow"></i> <span id="shareTitle">PASSENGER SHARE BY AIRPORT</span>
                         </h2>
                         <p id="shareCaption" class="text-[11px] text-slate-400">2025 full year, official totals</p>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-glow border border-cyan-500/40 shrink-0">2025</span>
+                    <span id="shareChip" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-glow border border-cyan-500/40 shrink-0">2025</span>
                 </div>
                 <div class="relative h-44 w-full flex items-center justify-center">
                     <canvas id="airportShareChart" aria-label="Passenger share by airport, 2025"></canvas>
@@ -130,7 +130,7 @@
                     </h2>
                     <span id="marketsPeriod" class="text-[11px] text-slate-400 shrink-0">2025</span>
                 </div>
-                <p class="text-[11px] text-slate-500 mb-3">Countries Dubai Airports names in its results. No airport publishes full regional totals.</p>
+                <p class="text-[11px] text-slate-500 mb-3">Countries and cities Dubai Airports names in its results. No airport publishes full regional totals, so region figures cover named countries only.</p>
                 <div id="marketList" class="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[380px]"></div>
             </div>
         </section>
@@ -250,7 +250,8 @@
             aw26: ['Aviation Week — Abu Dhabi expects to match passenger record', 'https://aviationweek.com/air-transport/airports-networks/abu-dhabi-expects-match-passenger-record-despite-disruption'],
             shQ1: ['Sharjah Airport — Q1 2025 performance', 'https://www.sharjahairport.ae/en/%D9%86%D9%85%D9%88-%D9%85%D8%AA%D8%B5%D8%A7%D8%B9%D8%AF-%D9%81%D9%8A-%D9%85%D8%A4%D8%B4%D8%B1%D8%A7%D8%AA-%D8%A7%D9%84%D8%A3%D8%AF%D8%A7%D8%A1-%D9%88%D9%82%D8%B7%D8%A7%D8%B9-%D8%A7%D9%84%D8%B7%D9%8A/'],
             ktH1: ['Khaleej Times — Sharjah Airport welcomes 9.11 million passengers in H1 2025', 'https://www.khaleejtimes.com/business/aviation/uae-sharjah-airport-passengers-traffic-travel'],
-            gnSH: ['Gulf News — Sharjah Airport passenger traffic jumps 14% to 19.4 million in 2025', 'https://gulfnews.com/business/aviation/sharjah-airport-passenger-traffic-jumps-14-to-194-million-in-2025-1.500415844']
+            gnSH: ['Gulf News — Sharjah Airport passenger traffic jumps 14% to 19.4 million in 2025', 'https://gulfnews.com/business/aviation/sharjah-airport-passenger-traffic-jumps-14-to-194-million-in-2025-1.500415844'],
+            td25: ['TravelDailyNews — Dubai International records 95.2m passengers in 2025', 'https://www.traveldailynews.com/aviation/dubai-international-records-95-2m-passengers-in-2025/']
         };
         const auhNote = 'Reported as "Abu Dhabi"; likely includes the group\'s smaller airports (9M + Q4 exceeds Zayed\'s 32.5m full year)';
         const T = (airport, year, period, kind, pax, mov, yoy, approx, note, src) =>
@@ -279,12 +280,18 @@
             T('SHJ',2025,'FY','actual',19.48,116657,13.9,false,'Movements +8.3% YoY',S.gnSH),
             T('RAK',2025,'FY','actual',1.3,null,null,false,'First year above 1 million',S.qz25)
         ];
-        const M = (year, period, country, region, pax, approx, src) =>
-            ({ airport: 'DXB', year, period, country, region, passengers_m: pax, approx, source_title: src[0], source_url: src[1] });
+        const M = (year, period, country, region, pax, approx, src, market_type = 'country', yoy = null) =>
+            ({ airport: 'DXB', year, period, country, region, passengers_m: pax, approx, market_type, yoy_pct: yoy, source_title: src[0], source_url: src[1] });
         let MARKETS = [
             M(2025,'FY','India','IND',11.9,false,S.gnFY), M(2025,'FY','Saudi Arabia','ME',7.5,false,S.gnFY),
             M(2025,'FY','United Kingdom','EU',6.3,false,S.gnFY), M(2025,'FY','Pakistan','IND',4.3,false,S.gnFY),
             M(2025,'FY','United States','AMER',3.3,false,S.gnFY),
+            M(2025,'FY','Russia','CIS',2.8,false,S.td25,'country',6), M(2025,'FY','China','ASIA',2.5,false,S.td25,'country',16.6),
+            M(2025,'FY','Turkey','EU',2.2,false,S.td25,'country',6.7), M(2025,'FY','Egypt','AFR',1.8,false,S.td25,'country',14.3),
+            M(2025,'FY','Italy','EU',1.6,false,S.td25,'country',12.5),
+            M(2025,'FY','London','EU',3.9,false,S.td25,'city'), M(2025,'FY','Riyadh','ME',3.0,false,S.td25,'city'),
+            M(2025,'FY','Mumbai','IND',2.4,false,S.td25,'city'), M(2025,'FY','Jeddah','ME',2.4,false,S.td25,'city'),
+            M(2025,'FY','New Delhi','IND',2.2,false,S.td25,'city'),
             M(2026,'Q1','India','IND',2.5,true,S.anQ1), M(2026,'Q1','Saudi Arabia','ME',1.3,true,S.anQ1),
             M(2026,'Q1','United Kingdom','EU',1.2,true,S.anQ1)
         ];
@@ -335,7 +342,7 @@
             if (Array.isArray(traffic) && traffic.length)
                 TRAFFIC = traffic.map(r => ({ ...r, year: Number(r.year), passengers_m: num(r.passengers_m), movements: num(r.movements), yoy_pct: num(r.yoy_pct) }));
             if (Array.isArray(markets) && markets.length)
-                MARKETS = markets.map(r => ({ ...r, year: Number(r.year), passengers_m: num(r.passengers_m) }));
+                MARKETS = markets.map(r => ({ ...r, market_type: r.market_type || 'country', year: Number(r.year), passengers_m: num(r.passengers_m), yoy_pct: num(r.yoy_pct) }));
             LIVE = config || {};
             renderLive();
             renderDashboard();
@@ -492,7 +499,7 @@
                 map.flyTo(reg.coords, 4, { duration: reduceMotion ? 0 : 1 });
                 document.getElementById('mapSubTitle').textContent = `Routes from ${reg.name} into the UAE`;
             }
-            renderMarkets();
+            renderDashboard();
             drawFlightPaths();
         }
 
@@ -523,7 +530,26 @@
                 white: { ring: 'ring-slate-500/20', text: 'text-white' }
             };
             const cards = [];
-            if (selectedYear === 2025) {
+            if (selectedRegion !== 'ALL') {
+                const reg = REGIONS.find(r => r.id === selectedRegion);
+                const countries = marketsFor(selectedYear).filter(m => m.region === reg.id);
+                const cities = marketsFor(selectedYear, 'city').filter(m => m.region === reg.id);
+                const base = dxbBase(selectedYear);
+                const label = marketPeriodLabel(selectedYear);
+                const total = countries.reduce((s, m) => s + m.passengers_m, 0);
+                const approx = countries.some(m => m.approx);
+                if (!countries.length) {
+                    cards.push(kpiCard({ label: `${reg.name} → DXB ${label}`, value: 'Not published', muted: true, sub: 'Dubai Airports named no country from this region', tone: tones.white, icon: 'fa-earth-americas', airport: 'DXB' }));
+                } else {
+                    cards.push(kpiCard({ label: `${reg.name} → DXB ${label}`, value: fmtM(total, approx), sub: `Named countries: ${countries.map(m => m.country).join(', ')}`, tone: tones.white, icon: 'fa-earth-americas', airport: 'DXB' }));
+                    cards.push(kpiCard({ label: `Share of DXB passengers`, value: base ? `${(total / base.passengers_m * 100).toFixed(1)}%` : '—', sub: base ? `of ${fmtM(base.passengers_m, base.approx)} DXB total, ${label}` : '', tone: tones.cyan, icon: 'fa-chart-pie', airport: 'DXB' }));
+                    const top = countries[0];
+                    cards.push(kpiCard({ label: 'Largest market', value: fmtM(top.passengers_m, top.approx), delta: top.yoy_pct, sub: `${top.country}${top.yoy_pct != null ? ' · growth vs 2024' : ''}`, tone: tones.amber, icon: 'fa-flag', airport: 'DXB' }));
+                }
+                cards.push(cities.length
+                    ? kpiCard({ label: 'Top city', value: fmtM(cities[0].passengers_m, cities[0].approx), sub: cities.map(c => `${c.country} ${fmtM(c.passengers_m, c.approx)}`).join(' · '), tone: tones.purple, icon: 'fa-city', airport: 'DXB' })
+                    : kpiCard({ label: 'Top city', value: 'Not published', muted: true, sub: marketsFor(selectedYear, 'city').length ? `No city from this region in DXB's ${label} top 5` : `Dubai Airports published no city figures for ${label}`, tone: tones.purple, icon: 'fa-city', airport: 'DXB' }));
+            } else if (selectedYear === 2025) {
                 const fy = a => get(a, 2025, 'FY');
                 const total = SHARE_AIRPORTS.reduce((s, a) => s + (fy(a)?.passengers_m || 0), 0);
                 const d = fy('DXB'), a = fy('AUH'), s = fy('SHJ');
@@ -552,13 +578,47 @@
             });
         }
 
+        const COUNTRY_COLORS = ['#22d3ee', '#c084fc', '#fbbf24', '#34d399', '#f472b6', '#94a3b8'];
         function renderShare() {
+            const shareTitle = document.getElementById('shareTitle');
+            const yearChip = document.getElementById('shareChip');
+            if (selectedRegion !== 'ALL') {
+                const reg = REGIONS.find(r => r.id === selectedRegion);
+                const countries = marketsFor(selectedYear).filter(m => m.region === reg.id);
+                const base = dxbBase(selectedYear);
+                const named = countries.reduce((s, m) => s + m.passengers_m, 0);
+                const other = base ? Math.max(0, base.passengers_m - named) : 0;
+                const rows = [...countries.map((m, i) => ({ label: m.country, v: m.passengers_m, approx: m.approx, color: COUNTRY_COLORS[i % 5] })),
+                              { label: 'Rest of DXB traffic', v: other, approx: base?.approx, color: '#1c2842' }];
+                const total = rows.reduce((s, r) => s + r.v, 0) || 1;
+                shareTitle.textContent = 'SHARE OF DXB PASSENGERS';
+                yearChip.textContent = marketPeriodLabel(selectedYear);
+                chart.data.labels = rows.map(r => r.label);
+                chart.data.datasets[0].data = rows.map(r => r.v / total * 100);
+                chart.data.datasets[0].backgroundColor = rows.map(r => r.color);
+                chart.update();
+                document.getElementById('shareCaption').textContent = countries.length
+                    ? `${reg.name}: named countries vs the rest of DXB, ${marketPeriodLabel(selectedYear)}`
+                    : `${reg.name}: no country figure published for ${marketPeriodLabel(selectedYear)}`;
+                document.getElementById('shareLegend').innerHTML = rows.map(r => `
+                    <div class="p-2 rounded-lg bg-navy-900/80 border border-slate-800">
+                        <div class="flex items-center justify-between font-semibold text-slate-300 gap-1">
+                            <span class="flex items-center gap-1.5 min-w-0"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${r.color};${r.color === '#1c2842' ? 'border:1px solid #475569' : ''}"></span> <span class="truncate">${esc(r.label)}</span></span>
+                            <span class="text-white font-bold tnum">${(r.v / total * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 tnum">${fmtM(r.v, r.approx)} passengers</div>
+                    </div>`).join('');
+                return;
+            }
+            shareTitle.textContent = 'PASSENGER SHARE BY AIRPORT';
+            yearChip.textContent = '2025';
             // Shares use the latest year every airport has published (2025)
             const rows = SHARE_AIRPORTS.map(a => ({ a, v: get(a, 2025, 'FY')?.passengers_m || 0 }));
             const total = rows.reduce((s, r) => s + r.v, 0) || 1;
             chart.data.labels = rows.map(r => AIRPORTS[r.a].name);
             chart.data.datasets[0].data = rows.map(r => r.v / total * 100);
             chart.data.datasets[0].backgroundColor = rows.map(r => AIRPORTS[r.a].color);
+            chart.data.labels = rows.map(r => AIRPORTS[r.a].name);
             chart.update();
             document.getElementById('shareCaption').textContent = selectedYear === 2026
                 ? '2025 shown: 2026 totals are only published for DXB so far'
@@ -573,29 +633,35 @@
                 </div>`).join('');
         }
 
-        function marketsFor(year) {
+        function marketsFor(year, type = 'country') {
             const period = year === 2025 ? 'FY' : 'Q1';
-            return MARKETS.filter(m => m.year === year && m.period === period).sort((a, b) => b.passengers_m - a.passengers_m);
+            return MARKETS.filter(m => m.year === year && m.period === period && (m.market_type || 'country') === type)
+                .sort((a, b) => b.passengers_m - a.passengers_m);
         }
+        const marketPeriodLabel = year => year === 2025 ? '2025' : 'Q1 2026';
+        const dxbBase = year => year === 2025 ? get('DXB', 2025, 'FY') : get('DXB', 2026, 'Q1');
 
         function renderMarkets() {
             const all = marketsFor(selectedYear);
-            const rows = selectedRegion === 'ALL' ? all : all.filter(m => m.region === selectedRegion);
+            const inRegion = m => selectedRegion === 'ALL' || m.region === selectedRegion;
+            const rows = all.filter(inRegion);
+            const cities = marketsFor(selectedYear, 'city').filter(inRegion);
             document.getElementById('marketsPeriod').textContent = selectedYear === 2025 ? '2025 full year' : 'Q1 2026 (latest published)';
             const list = document.getElementById('marketList');
-            if (!rows.length) {
+            if (!rows.length && !cities.length) {
                 const reg = REGIONS.find(r => r.id === selectedRegion);
                 list.innerHTML = `<div class="p-4 rounded-xl border border-dashed border-slate-700 text-xs text-slate-400">
                     Dubai Airports hasn't published passenger figures for ${esc(reg ? reg.name : 'this region')} in this period.</div>`;
                 return;
             }
             const max = Math.max(...all.map(m => m.passengers_m));
-            list.innerHTML = rows.map(m => {
+            const heading = t => `<div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 pt-1">${t}</div>`;
+            list.innerHTML = (rows.length ? heading('Countries') : '') + rows.map(m => {
                 const reg = REGIONS.find(r => r.id === m.region);
                 return `<div class="p-3 rounded-xl border bg-navy-900/50 border-slate-800/80">
                     <div class="flex items-center justify-between text-xs mb-1.5 gap-2">
                         <span class="font-bold text-white">${esc(m.country)}</span>
-                        <span class="font-extrabold text-cyan-300 tnum">${fmtM(m.passengers_m, m.approx)} <span class="text-[10px] text-slate-400 font-medium">passengers</span></span>
+                        <span class="font-extrabold text-cyan-300 tnum">${fmtM(m.passengers_m, m.approx)} <span class="text-[10px] text-slate-400 font-medium">passengers</span>${m.yoy_pct != null ? ` <span class="text-[10px] ${m.yoy_pct < 0 ? 'text-rose-400' : 'text-emerald-400'}">${fmtPct(m.yoy_pct)}</span>` : ''}</span>
                     </div>
                     <div class="w-full h-1.5 bg-navy-950 rounded-full overflow-hidden mb-1.5">
                         <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-glow rounded-full" style="width:${Math.round(m.passengers_m / max * 100)}%"></div>
@@ -605,7 +671,11 @@
                         <a class="src" href="${esc(m.source_url)}" target="_blank" rel="noopener">Source</a>
                     </div>
                 </div>`;
-            }).join('');
+            }).join('') + (cities.length ? heading('Cities') + cities.map(c => `
+                <div class="px-3 py-2 rounded-xl border bg-navy-900/30 border-slate-800/60 flex items-center justify-between text-xs gap-2">
+                    <span class="text-slate-200 font-semibold"><i class="fa-solid fa-city text-slate-500 mr-1.5"></i>${esc(c.country)}</span>
+                    <span class="tnum text-cyan-200 font-bold">${fmtM(c.passengers_m, c.approx)} <a class="src text-[10px] font-normal ml-1" href="${esc(c.source_url)}" target="_blank" rel="noopener">Source</a></span>
+                </div>`).join('') : '');
         }
 
         // --- 8. DETAIL MODAL ---
