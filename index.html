@@ -242,7 +242,7 @@
                         <span id="statDXB">63.5</span><span class="text-base">%</span>
                     </div>
                     <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
-                        <span>2,196 flights/week</span>
+                        <span id="subDXB">2,196 flights/week</span>
                         <span class="text-[10px] text-amber-400 group-hover:underline">YoY Trend &rarr;</span>
                     </div>
                     <div class="absolute -right-2 -bottom-2 opacity-10 text-amber-400 text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-crown"></i></div>
@@ -260,7 +260,7 @@
                         <span id="statOther">36.5</span><span class="text-base">%</span>
                     </div>
                     <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
-                        <span>1,262 flights/week</span>
+                        <span id="subOther">1,262 flights/week</span>
                         <span class="text-[10px] text-purple-400 group-hover:underline">YoY Trend &rarr;</span>
                     </div>
                     <div class="absolute -right-2 -bottom-2 opacity-10 text-purple-400 text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-network-wired"></i></div>
@@ -382,7 +382,8 @@
     <!-- Footer -->
     <footer class="glass-card mt-auto border-t border-slate-800 px-6 py-2.5 text-xs text-slate-400 flex flex-wrap justify-between items-center gap-2">
         <div class="flex items-center gap-4">
-            <span><i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i> Active Schedule Data Integrated</span>
+            <span id="dataStatus"><i class="fa-solid fa-circle-notch fa-spin text-cyan-glow mr-1.5"></i> Connecting to Supabase…</span>
+            <span id="liveFlights" class="hidden"></span>
             <span class="hidden sm:inline text-slate-700">|</span>
             <span class="hidden sm:inline"><i class="fa-solid fa-tower-cell text-cyan-glow mr-1.5"></i> UAE Airports: DXB, AUH, SHJ, DWC</span>
         </div>
@@ -490,7 +491,7 @@
                                 <th class="p-2">Month</th>
                                 <th class="p-2">2025 Baseline</th>
                                 <th class="p-2">2026 Current</th>
-                                <th class="p-2">Net Variance ($\Delta$)</th>
+                                <th class="p-2">Net Variance (&Delta;)</th>
                                 <th class="p-2 text-right">YoY Growth %</th>
                             </tr>
                         </thead>
@@ -515,6 +516,82 @@
 
     <!-- JS Application Script -->
     <script>
+        // --- 0. SUPABASE CONNECTION (publishable key: safe for the browser, read-only via RLS) ---
+        const SUPABASE_URL = "https://stdxueftoewwnhbqncbo.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_e3fPSUNOTlK9-t5XlFIDgA_TLHhKt1n";
+
+        // Snapshot of the Supabase data, used until (or if) the live read fails
+        let CONFIG = {
+            baseline_year: 2025, current_year: 2026,
+            total_active_flights: 3458, weekly_passengers: 603700,
+            dxb_share: 63.5, auh_share: 21.5, shj_share: 13.2, dwc_share: 1.8,
+            live_active_flights: null, live_updated_at: null
+        };
+        let MONTHLY = [
+            { month_name: "Jan", pax_2025: 452000, pax_2026: 485000, flights_2025: 2850, flights_2026: 3100 },
+            { month_name: "Feb", pax_2025: 468000, pax_2026: 502000, flights_2025: 2910, flights_2026: 3180 },
+            { month_name: "Mar", pax_2025: 489000, pax_2026: 521000, flights_2025: 3050, flights_2026: 3320 },
+            { month_name: "Apr", pax_2025: 471000, pax_2026: 508000, flights_2025: 2980, flights_2026: 3240 },
+            { month_name: "May", pax_2025: 482000, pax_2026: 519000, flights_2025: 3020, flights_2026: 3290 },
+            { month_name: "Jun", pax_2025: 510000, pax_2026: 548000, flights_2025: 3180, flights_2026: 3450 },
+            { month_name: "Jul", pax_2025: 525000, pax_2026: 562000, flights_2025: 3250, flights_2026: 3510 },
+            { month_name: "Aug", pax_2025: 531000, pax_2026: 570000, flights_2025: 3290, flights_2026: 3560 },
+            { month_name: "Sep", pax_2025: 462000, pax_2026: 495000, flights_2025: 2900, flights_2026: 3150 },
+            { month_name: "Oct", pax_2025: 498000, pax_2026: 532000, flights_2025: 3110, flights_2026: 3390 },
+            { month_name: "Nov", pax_2025: 512000, pax_2026: 550000, flights_2025: 3200, flights_2026: 3480 },
+            { month_name: "Dec", pax_2025: 545000, pax_2026: 580000, flights_2025: 3380, flights_2026: 3680 }
+        ];
+
+        async function sbSelect(table, query) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+                headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+            });
+            if (!res.ok) throw new Error(`${table}: HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function loadFromSupabase() {
+            const status = document.getElementById('dataStatus');
+            try {
+                const [cfgRows, monthRows] = await Promise.all([
+                    sbSelect('dashboard_config', 'select=*&order=id.asc&limit=1'),
+                    sbSelect('monthly_traffic', 'select=*&order=month_num.asc')
+                ]);
+                if (cfgRows.length) CONFIG = { ...CONFIG, ...cfgRows[0] };
+                if (monthRows.length) MONTHLY = monthRows;
+                applyConfig();
+                status.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i> Live data from Supabase';
+            } catch (err) {
+                console.warn('Supabase read failed, showing saved snapshot:', err);
+                status.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1.5"></i> Offline snapshot (Supabase unreachable)';
+            }
+        }
+
+        // Push the loaded config into the airport shares, region volumes and live badge
+        function applyConfig() {
+            AIRPORTS.DXB.share = Number(CONFIG.dxb_share);
+            AIRPORTS.AUH.share = Number(CONFIG.auh_share);
+            AIRPORTS.SHJ.share = Number(CONFIG.shj_share);
+            AIRPORTS.DWC.share = Number(CONFIG.dwc_share);
+
+            // Regions keep their relative mix; totals follow Supabase
+            const sumF = BASE_REGIONS.reduce((a, r) => a + r.flights, 0);
+            const sumP = BASE_REGIONS.reduce((a, r) => a + r.pax, 0);
+            REGIONS.forEach((r, i) => {
+                r.flights = Math.round(BASE_REGIONS[i].flights * CONFIG.total_active_flights / sumF);
+                r.pax = Math.round(BASE_REGIONS[i].pax * CONFIG.weekly_passengers / sumP);
+            });
+
+            const live = document.getElementById('liveFlights');
+            if (CONFIG.live_active_flights != null) {
+                const when = CONFIG.live_updated_at ? new Date(CONFIG.live_updated_at).toLocaleString() : 'unknown';
+                live.innerHTML = `<span class="text-slate-700 mr-3">|</span><i class="fa-solid fa-satellite-dish text-emerald-400 mr-1.5"></i> ${Number(CONFIG.live_active_flights).toLocaleString()} inbound flights airborne now · synced ${when}`;
+                live.classList.remove('hidden');
+            }
+
+            renderDashboard();
+        }
+
         // --- 1. GLOBAL DATA STRUCTURES ---
         const AIRPORTS = {
             DXB: { name: "Dubai Int'l (DXB)", coords: [25.2532, 55.3657], hub: "Emirates, flydubai", share: 63.5, color: "#22d3ee" },
@@ -534,12 +611,8 @@
             { id: "OCN", name: "Oceania (Australia/NZ)", coords: [-33.8688, 151.2093], flights: 70, pax: 19800, shares: { DXB: 80, AUH: 20, SHJ: 0, DWC: 0 } }
         ];
 
-        // 12-Month Comparative Data Series Model (2026 Current vs 2025 Previous Year)
-        const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        
-        // 2025 Baseline Index vs 2026 Current Index
-        const SEASONAL_INDEX_2025 = [1.00, 0.98, 0.95, 0.91, 0.85, 0.82, 0.79, 0.81, 0.88, 0.94, 1.02, 1.10];
-        const SEASONAL_INDEX_2026 = [1.08, 1.05, 1.02, 0.98, 0.92, 0.88, 0.85, 0.87, 0.94, 1.01, 1.10, 1.18];
+        // Original regional mix, kept so live totals can be redistributed proportionally
+        const BASE_REGIONS = REGIONS.map(r => ({ flights: r.flights, pax: r.pax }));
 
         // --- 2. STATE VARIABLES ---
         let selectedMetric = 'flights';
@@ -560,6 +633,7 @@
             initCanvas();
             initChart();
             renderDashboard();
+            loadFromSupabase();
 
             window.addEventListener('resize', () => {
                 resizeCanvas();
@@ -606,7 +680,7 @@
                     })
                 }).addTo(map);
 
-                marker.bindPopup(`
+                marker.bindPopup(() => `
                     <div class="p-1">
                         <div class="text-xs font-bold text-amber-400"><i class="fa-solid fa-plane-arrival"></i> ${ap.name}</div>
                         <div class="text-[11px] text-slate-300 mt-1">Base Hub: <b>${ap.hub}</b></div>
@@ -625,7 +699,7 @@
                     })
                 }).addTo(map);
 
-                marker.bindPopup(`
+                marker.bindPopup(() => `
                     <div class="p-1">
                         <div class="text-xs font-bold text-cyan-glow"><i class="fa-solid fa-earth-americas"></i> ${reg.name}</div>
                         <div class="text-[11px] text-slate-200 mt-1">Flights: <b>${reg.flights.toLocaleString()} /wk</b></div>
@@ -732,7 +806,7 @@
         function updateChartData() {
             if (!chart) return;
 
-            let dxb = 63.5, auh = 21.5, shj = 13.2, dwc = 1.8;
+            let dxb = AIRPORTS.DXB.share, auh = AIRPORTS.AUH.share, shj = AIRPORTS.SHJ.share, dwc = AIRPORTS.DWC.share;
 
             if (selectedRegion !== 'ALL') {
                 const reg = REGIONS.find(r => r.id === selectedRegion);
@@ -752,12 +826,12 @@
             document.getElementById('pctSHJ').textContent = shj + '%';
             document.getElementById('pctDWC').textContent = dwc + '%';
 
-            let baseVal = 3458;
+            let baseVal = Number(CONFIG.total_active_flights);
             if (selectedRegion !== 'ALL') {
                 const reg = REGIONS.find(r => r.id === selectedRegion);
                 if (reg) baseVal = (selectedMetric === 'pax') ? reg.pax : reg.flights;
             } else if (selectedMetric === 'pax') {
-                baseVal = 603700;
+                baseVal = Number(CONFIG.weekly_passengers);
             }
 
             const unit = (selectedMetric === 'pax') ? 'pax/wk' : 'fl/wk';
@@ -834,11 +908,16 @@
             });
 
             document.getElementById('statFlights').textContent = totalFlights.toLocaleString();
+            const dxbPct = (selectedRegion === 'ALL') ? AIRPORTS.DXB.share
+                : (REGIONS.find(r => r.id === selectedRegion) || { shares: { DXB: AIRPORTS.DXB.share } }).shares.DXB;
+            const dxbFlights = Math.round(totalFlights * dxbPct / 100);
+            document.getElementById('subDXB').textContent = `${dxbFlights.toLocaleString()} flights/week`;
+            document.getElementById('subOther').textContent = `${(totalFlights - dxbFlights).toLocaleString()} flights/week`;
             document.getElementById('statPax').textContent = totalPax.toLocaleString();
 
             if (selectedRegion === 'ALL') {
-                document.getElementById('statDXB').textContent = "63.5";
-                document.getElementById('statOther').textContent = "36.5";
+                document.getElementById('statDXB').textContent = AIRPORTS.DXB.share;
+                document.getElementById('statOther').textContent = (100 - AIRPORTS.DXB.share).toFixed(1);
             } else {
                 const reg = REGIONS.find(r => r.id === selectedRegion);
                 if (reg) {
@@ -858,7 +937,7 @@
                 return b.flights - a.flights;
             });
 
-            const maxVal = (selectedMetric === 'pax') ? 149600 : 930;
+            const maxVal = Math.max(...REGIONS.map(r => (selectedMetric === 'pax') ? r.pax : r.flights));
 
             sorted.forEach(region => {
                 const isSelected = (selectedRegion === region.id);
@@ -918,7 +997,7 @@
             const modal = document.getElementById('trendModal');
             modal.classList.remove('hidden');
 
-            renderTrendModalContent();
+            switchModalView(currentModalView);
         }
 
         function closeTrendModal() {
@@ -951,28 +1030,22 @@
         }
 
         function renderTrendModalContent() {
-            // Determine base scale depending on selected card
-            let baseVal2025 = 560000; // 2025 pax baseline
-            let baseVal2026 = 603700; // 2026 current pax
-            let metricUnit = "pax/wk";
+            // Real monthly series from Supabase (monthly_traffic)
+            const useFlights = (currentModalView === 'flights') ||
+                (currentModalCard === 'flights' && currentModalView !== 'pax');
+            let factor = 1;
+            let metricUnit = useFlights ? "flights" : "pax";
 
-            if (currentModalCard === 'flights' || currentModalView === 'flights') {
-                baseVal2025 = 3200;
-                baseVal2026 = 3458;
-                metricUnit = "flights/wk";
-            } else if (currentModalCard === 'dxb') {
-                baseVal2025 = 355600; // DXB Share of Pax (2025)
-                baseVal2026 = 383300; // DXB Share of Pax (2026)
-                metricUnit = "DXB pax/wk";
+            if (currentModalCard === 'dxb') {
+                factor = AIRPORTS.DXB.share / 100;
+                metricUnit = "DXB " + metricUnit;
             } else if (currentModalCard === 'others') {
-                baseVal2025 = 204400; // AUH/SHJ/DWC Share (2025)
-                baseVal2026 = 220400; // AUH/SHJ/DWC Share (2026)
-                metricUnit = "Other Hubs pax/wk";
+                factor = (100 - AIRPORTS.DXB.share) / 100;
+                metricUnit = "AUH/SHJ/DWC " + metricUnit;
             }
 
-            // Calculate 12-month arrays for 2025 Baseline vs 2026 Current
-            const series2025 = SEASONAL_INDEX_2025.map(idx => Math.round(baseVal2025 * idx));
-            const series2026 = SEASONAL_INDEX_2026.map(idx => Math.round(baseVal2026 * idx));
+            const series2025 = MONTHLY.map(m => Math.round(Number(useFlights ? m.flights_2025 : m.pax_2025) * factor));
+            const series2026 = MONTHLY.map(m => Math.round(Number(useFlights ? m.flights_2026 : m.pax_2026) * factor));
 
             // Calculate Net Variance and YoY % Delta (2026 vs 2025)
             const netVariance = series2026.map((val, i) => val - series2025[i]);
@@ -982,15 +1055,23 @@
             });
 
             // Update Summary KPI Panel
-            const avg2026 = Math.round(series2026.reduce((a, b) => a + b, 0) / 12);
-            const avg2025 = Math.round(series2025.reduce((a, b) => a + b, 0) / 12);
+            const n = series2026.length || 1;
+            const avg2026 = Math.round(series2026.reduce((a, b) => a + b, 0) / n);
+            const avg2025 = Math.round(series2025.reduce((a, b) => a + b, 0) / n);
             const netDiff = avg2026 - avg2025;
             const avgYoYPct = (((avg2026 - avg2025) / avg2025) * 100).toFixed(1);
+            const up = netDiff >= 0;
+            const sign = up ? '+' : '';
+            const tone = up ? 'text-emerald-400' : 'text-rose-400';
 
             document.getElementById('mStat2026Val').textContent = `${avg2026.toLocaleString()} ${metricUnit}`;
             document.getElementById('mStat2025Val').textContent = `${avg2025.toLocaleString()} ${metricUnit}`;
-            document.getElementById('mStatYoYNet').innerHTML = `+${netDiff.toLocaleString()} ${metricUnit} <i class="fa-solid fa-arrow-up text-xs"></i>`;
-            document.getElementById('mStatYoYPct').textContent = `+${avgYoYPct}%`;
+            const netEl = document.getElementById('mStatYoYNet');
+            netEl.className = `text-xl font-black ${tone} mt-0.5 flex items-center gap-1`;
+            netEl.innerHTML = `${sign}${netDiff.toLocaleString()} ${metricUnit} <i class="fa-solid fa-arrow-${up ? 'up' : 'down'} text-xs"></i>`;
+            const pctEl = document.getElementById('mStatYoYPct');
+            pctEl.className = `text-xl font-black ${tone} mt-0.5`;
+            pctEl.textContent = `${sign}${avgYoYPct}%`;
 
             // Render Chart.js Multi-Axis Comparison Chart
             renderModalChart(series2025, series2026, yoyDeltaPct, metricUnit);
@@ -1011,7 +1092,7 @@
                 modalChart = new Chart(ctxModal, {
                     type: 'bar',
                     data: {
-                        labels: MONTHS,
+                        labels: MONTHLY.map(m => m.month_name),
                         datasets: [{
                             label: '2026 vs 2025 YoY Growth % Delta',
                             data: yoyDelta,
@@ -1028,7 +1109,7 @@
                             legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } } },
                             tooltip: {
                                 callbacks: {
-                                    label: (ctx) => ` YoY Growth: +${ctx.raw}% vs 2025`
+                                    label: (ctx) => ` YoY Growth: ${ctx.raw >= 0 ? '+' : ''}${ctx.raw}% vs 2025`
                                 }
                             }
                         },
@@ -1046,7 +1127,7 @@
                 modalChart = new Chart(ctxModal, {
                     type: 'line',
                     data: {
-                        labels: MONTHS,
+                        labels: MONTHLY.map(m => m.month_name),
                         datasets: [
                             {
                                 label: '2026 Current Traffic',
@@ -1118,7 +1199,8 @@
             const tbody = document.getElementById('modalTableBody');
             tbody.innerHTML = '';
 
-            MONTHS.forEach((month, idx) => {
+            MONTHLY.forEach((m, idx) => {
+                const month = m.month_name;
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-navy-800/50 transition";
 
@@ -1135,7 +1217,7 @@
                     <td class="p-2 font-bold text-white">${month}</td>
                     <td class="p-2 font-mono text-amber-300/90">${val2025.toLocaleString()}</td>
                     <td class="p-2 font-mono text-cyan-300 font-bold">${val2026.toLocaleString()}</td>
-                    <td class="p-2 font-mono text-emerald-400">+${diff.toLocaleString()}</td>
+                    <td class="p-2 font-mono ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${diff >= 0 ? '+' : ''}${diff.toLocaleString()}</td>
                     <td class="p-2 text-right">${badgePct}</td>
                 `;
 
