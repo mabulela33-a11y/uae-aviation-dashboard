@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAE Aviation Global Flight Command Center & Trend Visualizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        navy: {
+                            950: '#060911',
+                            900: '#0b0f19',
+                            800: '#131b2e',
+                            700: '#1c2842',
+                            600: '#2a3b5e'
+                        },
+                        cyan: {
+                            glow: '#00f2fe',
+                            accent: '#4facfe'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #060911;
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism styling */
+        .glass-card {
+            background: rgba(19, 27, 46, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        }
+
+        .glass-card-hover {
+            transition: all 0.25s ease-in-out;
+            cursor: pointer;
+        }
+        .glass-card-hover:hover {
+            border-color: rgba(0, 242, 254, 0.5);
+            box-shadow: 0 0 25px rgba(0, 242, 254, 0.25);
+            transform: translateY(-3px);
+        }
+
+        /* Leaflet Container & Canvas Overlay */
+        #map-container {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            background-color: #060911;
+            position: relative;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        #leaflet-map {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #flight-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Leaflet Popup Styling */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: rgba(11, 15, 25, 0.95) !important;
+            color: #f8fafc !important;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
+            border-radius: 12px;
+        }
+
+        /* Custom Node Pulsing Markers */
+        .hub-node-uae {
+            background: radial-gradient(circle, #f6d365 0%, #fda085 100%);
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 15px rgba(246, 211, 101, 0.8);
+            animation: pulse-gold 2s infinite;
+        }
+
+        .region-node-origin {
+            background: radial-gradient(circle, #00f2fe 0%, #4facfe 100%);
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.8);
+            animation: pulse-cyan 2.5s infinite;
+        }
+
+        @keyframes pulse-cyan {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
+            70% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(0, 242, 254, 0); }
+            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+        }
+
+        @keyframes pulse-gold {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(246, 211, 101, 0.8); }
+            70% { transform: scale(1.25); box-shadow: 0 0 0 12px rgba(246, 211, 101, 0); }
+            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(246, 211, 101, 0); }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #060911;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1c2842;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f2fe;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- Top Navigation & Header Controls -->
+    <header class="glass-card sticky top-0 z-40 border-b border-slate-800 px-4 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center text-navy-950 font-black text-xl shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-plane-departure"></i>
+            </div>
+            <div>
+                <h1 class="text-base lg:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    UAE GLOBAL AVIATION COMMAND CENTER
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-glow border border-cyan-500/30">2026 vs 2025 YoY COMPARISON</span>
+                </h1>
+                <p class="text-xs text-slate-400">Global Corridor Volumes, UAE Hub Distribution & YoY Monthly Growth Variances</p>
+            </div>
+        </div>
+
+        <!-- Metric Switcher Tabs -->
+        <div class="flex items-center bg-navy-900 p-1 rounded-xl border border-slate-700/80">
+            <button id="tabFlights" onclick="setMetricMode('flights')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-navy-950 bg-cyan-glow shadow-sm">
+                <i class="fa-solid fa-plane text-xs mr-1.5"></i> Flight Volume
+            </button>
+            <button id="tabPax" onclick="setMetricMode('pax')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-users text-xs mr-1.5"></i> Passenger Volume
+            </button>
+            <button id="tabWeight" onclick="setMetricMode('weight')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-chart-pie text-xs mr-1.5"></i> Airport Weight %
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1920px] mx-auto w-full">
+
+        <!-- Left Main Column (8 Cols): Interactive KPI Cards + Curved Map -->
+        <section class="lg:col-span-8 flex flex-col gap-5">
+
+            <!-- Top 4 Interactive KPI Cards (Clickable for 2026 vs 2025 YoY Modal) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                
+                <!-- Card 1: Flights -->
+                <div id="card-flights" onclick="openTrendModal('flights')" class="glass-card glass-card-hover p-4 rounded-xl relative overflow-hidden ring-1 ring-cyan-500/20 group">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Total Active Flights</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-glow border border-cyan-500/30 group-hover:bg-cyan-glow group-hover:text-navy-950 transition">
+                            <i class="fa-solid fa-code-compare mr-0.5"></i> 2026 vs '25
+                        </span>
+                    </div>
+                    <div class="text-2xl lg:text-3xl font-black text-white flex items-baseline gap-1.5">
+                        <span id="statFlights">3,458</span>
+                        <span class="text-xs font-medium text-emerald-400"><i class="fa-solid fa-arrow-trend-up"></i> /wk</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
+                        <span>Global direct routes</span>
+                        <span class="text-[10px] text-cyan-400 group-hover:underline">YoY Trend &rarr;</span>
+                    </div>
+                    <div class="absolute -right-2 -bottom-2 opacity-10 text-cyan-glow text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-plane"></i></div>
+                </div>
+
+                <!-- Card 2: Passengers -->
+                <div id="card-pax" onclick="openTrendModal('pax')" class="glass-card glass-card-hover p-4 rounded-xl relative overflow-hidden ring-1 ring-cyan-500/20 group">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Weekly Passengers</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-glow border border-cyan-500/30 group-hover:bg-cyan-glow group-hover:text-navy-950 transition">
+                            <i class="fa-solid fa-code-compare mr-0.5"></i> 2026 vs '25
+                        </span>
+                    </div>
+                    <div class="text-2xl lg:text-3xl font-black text-cyan-glow flex items-baseline gap-1.5">
+                        <span id="statPax">603,700</span>
+                        <span class="text-xs font-medium text-cyan-400">pax/wk</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
+                        <span>Avg 82% load factor</span>
+                        <span class="text-[10px] text-cyan-400 group-hover:underline">YoY Trend &rarr;</span>
+                    </div>
+                    <div class="absolute -right-2 -bottom-2 opacity-10 text-cyan-glow text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-users"></i></div>
+                </div>
+
+                <!-- Card 3: DXB Share -->
+                <div id="card-dxb" onclick="openTrendModal('dxb')" class="glass-card glass-card-hover p-4 rounded-xl relative overflow-hidden ring-1 ring-amber-500/20 group">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Dubai (DXB) Share</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:bg-amber-400 group-hover:text-navy-950 transition">
+                            <i class="fa-solid fa-code-compare mr-0.5"></i> 2026 vs '25
+                        </span>
+                    </div>
+                    <div class="text-2xl lg:text-3xl font-black text-amber-400 flex items-baseline gap-1">
+                        <span id="statDXB">63.5</span><span class="text-base">%</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
+                        <span>2,196 flights/week</span>
+                        <span class="text-[10px] text-amber-400 group-hover:underline">YoY Trend &rarr;</span>
+                    </div>
+                    <div class="absolute -right-2 -bottom-2 opacity-10 text-amber-400 text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-crown"></i></div>
+                </div>
+
+                <!-- Card 4: Other Hubs -->
+                <div id="card-others" onclick="openTrendModal('others')" class="glass-card glass-card-hover p-4 rounded-xl relative overflow-hidden ring-1 ring-purple-500/20 group">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">AUH / SHJ / DWC Hubs</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 group-hover:bg-purple-400 group-hover:text-navy-950 transition">
+                            <i class="fa-solid fa-code-compare mr-0.5"></i> 2026 vs '25
+                        </span>
+                    </div>
+                    <div class="text-2xl lg:text-3xl font-black text-purple-400 flex items-baseline gap-1">
+                        <span id="statOther">36.5</span><span class="text-base">%</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1 flex justify-between items-center">
+                        <span>1,262 flights/week</span>
+                        <span class="text-[10px] text-purple-400 group-hover:underline">YoY Trend &rarr;</span>
+                    </div>
+                    <div class="absolute -right-2 -bottom-2 opacity-10 text-purple-400 text-5xl group-hover:opacity-20 transition"><i class="fa-solid fa-network-wired"></i></div>
+                </div>
+
+            </div>
+
+            <!-- Region Filter Buttons Toolbar -->
+            <div class="glass-card p-2.5 rounded-xl flex flex-wrap items-center gap-1.5 border border-slate-800">
+                <span class="text-xs font-bold text-slate-400 px-2 flex items-center gap-1">
+                    <i class="fa-solid fa-filter text-cyan-glow"></i> Region Filter:
+                </span>
+                <button onclick="filterRegion('ALL')" class="btn-region border border-cyan-glow/50 bg-cyan-glow/20 text-cyan-glow px-3 py-1 rounded-lg text-xs font-bold transition" data-region="ALL">All Regions</button>
+                <button onclick="filterRegion('ME')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="ME">Middle East</button>
+                <button onclick="filterRegion('EU')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="EU">Europe</button>
+                <button onclick="filterRegion('ASIA')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="ASIA">Asia</button>
+                <button onclick="filterRegion('IND')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="IND">India</button>
+                <button onclick="filterRegion('AFR')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="AFR">Africa</button>
+                <button onclick="filterRegion('AMER')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="AMER">Americas</button>
+                <button onclick="filterRegion('CIS')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="CIS">CIS</button>
+                <button onclick="filterRegion('OCN')" class="btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition" data-region="OCN">Oceania</button>
+            </div>
+
+            <!-- Map Viewport -->
+            <div class="glass-card rounded-2xl p-1 relative flex-1 min-h-[500px] flex flex-col">
+                <div class="absolute top-4 left-4 z-[300] glass-card px-3.5 py-2 rounded-xl border border-slate-700/80">
+                    <div class="text-xs font-bold text-white flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-glow animate-ping"></span>
+                        ANIMATED GEODESIC FLIGHT CORRIDORS
+                    </div>
+                    <div id="mapSubTitle" class="text-[11px] text-slate-300 mt-0.5">Displaying 8 global regional routes into UAE Airports</div>
+                </div>
+
+                <div id="map-container">
+                    <div id="leaflet-map"></div>
+                    <canvas id="flight-canvas"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Side Analytics Panel (4 Cols): Charts & Regional Cards -->
+        <section class="lg:col-span-4 flex flex-col gap-5">
+
+            <!-- Airport Distribution Chart Card -->
+            <div class="glass-card p-5 rounded-2xl flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-cyan-glow"></i>
+                            UAE AIRPORT WEIGHT DISTRIBUTION
+                        </h2>
+                        <p class="text-[11px] text-slate-400">Share of traffic by hub airport</p>
+                    </div>
+                    <span id="chartRegionLabel" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-glow border border-cyan-500/40">
+                        GLOBAL
+                    </span>
+                </div>
+
+                <!-- Doughnut Chart Canvas -->
+                <div class="relative h-44 w-full flex items-center justify-center">
+                    <canvas id="airportShareChart"></canvas>
+                </div>
+
+                <!-- Custom Airport Legend Breakdown -->
+                <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                    <div class="p-2 rounded-lg bg-navy-900/80 border border-slate-800">
+                        <div class="flex items-center justify-between font-semibold text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> DXB</span>
+                            <span id="pctDXB" class="text-white font-bold">63.5%</span>
+                        </div>
+                        <div id="valDXB" class="text-[10px] text-slate-500 mt-0.5">2,196 flights/wk</div>
+                    </div>
+
+                    <div class="p-2 rounded-lg bg-navy-900/80 border border-slate-800">
+                        <div class="flex items-center justify-between font-semibold text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span> AUH</span>
+                            <span id="pctAUH" class="text-white font-bold">21.5%</span>
+                        </div>
+                        <div id="valAUH" class="text-[10px] text-slate-500 mt-0.5">743 flights/wk</div>
+                    </div>
+
+                    <div class="p-2 rounded-lg bg-navy-900/80 border border-slate-800">
+                        <div class="flex items-center justify-between font-semibold text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> SHJ</span>
+                            <span id="pctSHJ" class="text-white font-bold">13.2%</span>
+                        </div>
+                        <div id="valSHJ" class="text-[10px] text-slate-500 mt-0.5">456 flights/wk</div>
+                    </div>
+
+                    <div class="p-2 rounded-lg bg-navy-900/80 border border-slate-800">
+                        <div class="flex items-center justify-between font-semibold text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span> DWC/Other</span>
+                            <span id="pctDWC" class="text-white font-bold">1.8%</span>
+                        </div>
+                        <div id="valDWC" class="text-[10px] text-slate-500 mt-0.5">63 flights/wk</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Regional Ranked Volume List Card -->
+            <div class="glass-card p-5 rounded-2xl flex-1 flex flex-col min-h-[350px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-cyan-glow"></i>
+                        REGIONAL TRAFFIC RANKINGS
+                    </h2>
+                    <span class="text-[11px] text-slate-400" id="rankingMetricLabel">By Flight Count</span>
+                </div>
+
+                <!-- Scrollable Cards -->
+                <div id="regionalList" class="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[380px]">
+                    <!-- Rendered via JS -->
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-card mt-auto border-t border-slate-800 px-6 py-2.5 text-xs text-slate-400 flex flex-wrap justify-between items-center gap-2">
+        <div class="flex items-center gap-4">
+            <span><i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i> Active Schedule Data Integrated</span>
+            <span class="hidden sm:inline text-slate-700">|</span>
+            <span class="hidden sm:inline"><i class="fa-solid fa-tower-cell text-cyan-glow mr-1.5"></i> UAE Airports: DXB, AUH, SHJ, DWC</span>
+        </div>
+        <div>
+            UAE Global Aviation Visualization &copy; 2026 (YoY 2026 vs 2025)
+        </div>
+    </footer>
+
+
+    <!-- =================================================================== -->
+    <!-- YEAR-OVER-YEAR MONTHLY ANALYTICS MODAL: 2026 vs 2025 (#trendModal)   -->
+    <!-- =================================================================== -->
+    <div id="trendModal" class="fixed inset-0 z-[9999] hidden flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md">
+        
+        <!-- Modal Dialog Box -->
+        <div class="glass-card border border-cyan-500/40 rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto flex flex-col shadow-2xl shadow-cyan-500/20 p-6 relative">
+            
+            <!-- Modal Close Button -->
+            <button onclick="closeTrendModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white w-9 h-9 rounded-xl bg-navy-900 border border-slate-700 flex items-center justify-center transition hover:border-cyan-glow">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- Modal Header -->
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4 pr-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-glow/20 border border-cyan-glow/40 flex items-center justify-center text-cyan-glow text-xl">
+                        <i class="fa-solid fa-code-compare"></i>
+                    </div>
+                    <div>
+                        <h2 id="modalTitle" class="text-lg font-extrabold text-white uppercase tracking-tight">Year-over-Year Monthly Analytics: 2026 (Current) vs 2025 (Previous Year)</h2>
+                        <p id="modalSubTitle" class="text-xs text-slate-400">Comparing monthly traffic performance, seasonal swings & growth deltas across all 12 calendar months</p>
+                    </div>
+                </div>
+
+                <!-- View Switcher inside Modal -->
+                <div class="flex items-center bg-navy-900 p-1 rounded-xl border border-slate-800">
+                    <button id="modalTabPax" onclick="switchModalView('pax')" class="px-3 py-1 rounded-lg text-xs font-bold bg-cyan-glow text-navy-950 transition">
+                        Passenger Volume (Pax)
+                    </button>
+                    <button id="modalTabFlights" onclick="switchModalView('flights')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                        Flight Count
+                    </button>
+                    <button id="modalTabDelta" onclick="switchModalView('delta')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                        YoY Delta (%)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Variance Metrics Summary Panel (2026 vs 2025) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-5">
+                
+                <div class="p-3.5 rounded-xl bg-navy-900/90 border border-slate-800">
+                    <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">2026 Current Volume</div>
+                    <div id="mStat2026Val" class="text-xl font-black text-cyan-glow mt-0.5">
+                        603,700 pax/wk
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">Current Year Average</div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-navy-900/90 border border-slate-800">
+                    <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">2025 Baseline Volume</div>
+                    <div id="mStat2025Val" class="text-xl font-black text-amber-400 mt-0.5">
+                        560,000 pax/wk
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">Previous Year Baseline</div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-navy-900/90 border border-slate-800">
+                    <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">YoY Net Expansion</div>
+                    <div id="mStatYoYNet" class="text-xl font-black text-emerald-400 mt-0.5 flex items-center gap-1">
+                        +43,700 pax/wk <i class="fa-solid fa-arrow-up text-xs"></i>
+                    </div>
+                    <div class="text-[10px] text-emerald-400/80 mt-1">Capacity expansion</div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-navy-900/90 border border-slate-800">
+                    <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Avg YoY % Delta</div>
+                    <div id="mStatYoYPct" class="text-xl font-black text-emerald-400 mt-0.5">
+                        +7.8%
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">2026 vs 2025 Average</div>
+                </div>
+
+            </div>
+
+            <!-- Chart Canvas Container -->
+            <div class="relative w-full h-[320px] bg-navy-900/60 rounded-xl p-3 border border-slate-800/80 mb-5">
+                <canvas id="modalChartCanvas"></canvas>
+            </div>
+
+            <!-- 12-Month Comparison Table (2026 vs 2025) -->
+            <div class="border-t border-slate-800 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-table-list text-cyan-glow"></i>
+                        12-Month Comparative Data Table: 2026 (Current) vs 2025 (Previous Year)
+                    </h3>
+                    <span class="text-[10px] text-slate-400">Green = Growth | Red = Decline</span>
+                </div>
+
+                <div class="overflow-x-auto max-h-[170px] overflow-y-auto rounded-lg border border-slate-800">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-navy-900 text-[10px] uppercase font-bold text-slate-400 sticky top-0 border-b border-slate-800">
+                            <tr>
+                                <th class="p-2">Month</th>
+                                <th class="p-2">2025 Baseline</th>
+                                <th class="p-2">2026 Current</th>
+                                <th class="p-2">Net Variance ($\Delta$)</th>
+                                <th class="p-2 text-right">YoY Growth %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTableBody" class="divide-y divide-slate-800/50 text-[11px]">
+                            <!-- Generated via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer Action -->
+            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
+                <span>Data Source: UAE General Civil Aviation Authority & Air Traffic Statistics (2025-2026)</span>
+                <button onclick="closeTrendModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium transition">
+                    Close Visualizer
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- JS Application Script -->
+    <script>
+        // --- 1. GLOBAL DATA STRUCTURES ---
+        const AIRPORTS = {
+            DXB: { name: "Dubai Int'l (DXB)", coords: [25.2532, 55.3657], hub: "Emirates, flydubai", share: 63.5, color: "#22d3ee" },
+            AUH: { name: "Zayed Int'l (AUH)", coords: [24.4330, 54.6511], hub: "Etihad Airways", share: 21.5, color: "#c084fc" },
+            SHJ: { name: "Sharjah Int'l (SHJ)", coords: [25.3286, 55.5172], hub: "Air Arabia", share: 13.2, color: "#fbbf24" },
+            DWC: { name: "Al Maktoum Int'l (DWC)", coords: [24.8961, 55.1614], hub: "Charters & Budget", share: 1.8, color: "#94a3b8" }
+        };
+
+        const REGIONS = [
+            { id: "ME", name: "Middle East & GCC", coords: [24.7136, 46.6753], flights: 930, pax: 149600, shares: { DXB: 55, AUH: 23, SHJ: 20, DWC: 2 } },
+            { id: "EU", name: "Europe & UK", coords: [50.1109, 8.6821], flights: 727, pax: 129400, shares: { DXB: 68, AUH: 22, SHJ: 8, DWC: 2 } },
+            { id: "ASIA", name: "Asia (East & SE)", coords: [13.7563, 100.5018], flights: 535, pax: 92500, shares: { DXB: 66, AUH: 22, SHJ: 11, DWC: 1 } },
+            { id: "IND", name: "India Corridor", coords: [20.5937, 78.9629], flights: 500, pax: 82000, shares: { DXB: 60, AUH: 22, SHJ: 15, DWC: 3 } },
+            { id: "AFR", name: "Africa", coords: [9.0250, 38.7469], flights: 274, pax: 50400, shares: { DXB: 65, AUH: 20, SHJ: 14, DWC: 1 } },
+            { id: "AMER", name: "Americas (North & South)", coords: [40.7128, -74.0060], flights: 152, pax: 40200, shares: { DXB: 78, AUH: 22, SHJ: 0, DWC: 0 } },
+            { id: "CIS", name: "CIS & Regional Partners", coords: [55.7558, 37.6173], flights: 270, pax: 39800, shares: { DXB: 62, AUH: 20, SHJ: 13, DWC: 5 } },
+            { id: "OCN", name: "Oceania (Australia/NZ)", coords: [-33.8688, 151.2093], flights: 70, pax: 19800, shares: { DXB: 80, AUH: 20, SHJ: 0, DWC: 0 } }
+        ];
+
+        // 12-Month Comparative Data Series Model (2026 Current vs 2025 Previous Year)
+        const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        
+        // 2025 Baseline Index vs 2026 Current Index
+        const SEASONAL_INDEX_2025 = [1.00, 0.98, 0.95, 0.91, 0.85, 0.82, 0.79, 0.81, 0.88, 0.94, 1.02, 1.10];
+        const SEASONAL_INDEX_2026 = [1.08, 1.05, 1.02, 0.98, 0.92, 0.88, 0.85, 0.87, 0.94, 1.01, 1.10, 1.18];
+
+        // --- 2. STATE VARIABLES ---
+        let selectedMetric = 'flights';
+        let selectedRegion = 'ALL';
+        let currentModalCard = 'pax'; // 'flights', 'pax', 'dxb', 'others'
+        let currentModalView = 'pax'; // 'pax', 'flights', 'delta'
+
+        let map = null;
+        let canvas = null;
+        let ctx = null;
+        let animOffset = 0;
+        let chart = null;
+        let modalChart = null;
+
+        // --- 3. DOM LOADED INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            initCanvas();
+            initChart();
+            renderDashboard();
+
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                drawFlightPaths();
+            });
+
+            // Close Modal on ESC key press
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeTrendModal();
+            });
+
+            // Close Modal when clicking outside the dialog card
+            document.getElementById('trendModal').addEventListener('click', (e) => {
+                if (e.target.id === 'trendModal') closeTrendModal();
+            });
+        });
+
+        // --- 4. LEAFLET MAP INITIALIZATION ---
+        function initMap() {
+            map = L.map('leaflet-map', {
+                center: [23.5, 45.0],
+                zoom: 3,
+                minZoom: 2,
+                maxZoom: 7,
+                zoomControl: false
+            });
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // Esri World Dark Gray Canvas Tile Layer (Completely Free & No API Key Required)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+                maxZoom: 16
+            }).addTo(map);
+
+            // Add Markers for UAE Hubs
+            Object.keys(AIRPORTS).forEach(key => {
+                const ap = AIRPORTS[key];
+                const marker = L.marker(ap.coords, {
+                    icon: L.divIcon({
+                        className: 'hub-node-uae',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    })
+                }).addTo(map);
+
+                marker.bindPopup(`
+                    <div class="p-1">
+                        <div class="text-xs font-bold text-amber-400"><i class="fa-solid fa-plane-arrival"></i> ${ap.name}</div>
+                        <div class="text-[11px] text-slate-300 mt-1">Base Hub: <b>${ap.hub}</b></div>
+                        <div class="text-[11px] text-cyan-glow">Traffic Weight: <b>${ap.share}%</b></div>
+                    </div>
+                `);
+            });
+
+            // Add Markers for Region Origins
+            REGIONS.forEach(reg => {
+                const marker = L.marker(reg.coords, {
+                    icon: L.divIcon({
+                        className: 'region-node-origin',
+                        iconSize: [14, 14],
+                        iconAnchor: [7, 7]
+                    })
+                }).addTo(map);
+
+                marker.bindPopup(`
+                    <div class="p-1">
+                        <div class="text-xs font-bold text-cyan-glow"><i class="fa-solid fa-earth-americas"></i> ${reg.name}</div>
+                        <div class="text-[11px] text-slate-200 mt-1">Flights: <b>${reg.flights.toLocaleString()} /wk</b></div>
+                        <div class="text-[11px] text-slate-200">Passengers: <b>${reg.pax.toLocaleString()} pax/wk</b></div>
+                    </div>
+                `);
+
+                marker.on('click', () => filterRegion(reg.id));
+            });
+
+            map.on('move', drawFlightPaths);
+            map.on('zoomend', drawFlightPaths);
+        }
+
+        // --- 5. CANVAS ANIMATED ARCS ---
+        function initCanvas() {
+            canvas = document.getElementById('flight-canvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+            startAnimation();
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('map-container');
+            if (!container) return;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        function startAnimation() {
+            function animate() {
+                animOffset = (animOffset + 0.4) % 30;
+                drawFlightPaths();
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        function drawFlightPaths() {
+            if (!ctx || !map) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const destPoint = map.latLngToContainerPoint(AIRPORTS.DXB.coords);
+
+            REGIONS.forEach(reg => {
+                if (selectedRegion !== 'ALL' && selectedRegion !== reg.id) return;
+
+                const startPoint = map.latLngToContainerPoint(reg.coords);
+
+                const midX = (startPoint.x + destPoint.x) / 2;
+                const midY = (startPoint.y + destPoint.y) / 2;
+                const dx = destPoint.x - startPoint.x;
+                const dy = destPoint.y - startPoint.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                const curveFactor = Math.min(120, distance * 0.25);
+                const controlX = midX - (dy / distance) * curveFactor;
+                const controlY = midY + (dx / distance) * curveFactor;
+
+                // Outer Arc Line
+                ctx.beginPath();
+                ctx.moveTo(startPoint.x, startPoint.y);
+                ctx.quadraticCurveTo(controlX, controlY, destPoint.x, destPoint.y);
+                ctx.strokeStyle = (selectedRegion === reg.id) ? 'rgba(0, 242, 254, 0.9)' : 'rgba(0, 242, 254, 0.35)';
+                ctx.lineWidth = (selectedRegion === reg.id) ? 3.5 : 2;
+                ctx.stroke();
+
+                // Inner Dashed Line
+                ctx.beginPath();
+                ctx.moveTo(startPoint.x, startPoint.y);
+                ctx.quadraticCurveTo(controlX, controlY, destPoint.x, destPoint.y);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = (selectedRegion === reg.id) ? 2.5 : 1.5;
+                ctx.setLineDash([6, 12]);
+                ctx.lineDashOffset = -animOffset;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+        }
+
+        // --- 6. DASHBOARD MAIN DOUGHNUT CHART ---
+        function initChart() {
+            const ctxChart = document.getElementById('airportShareChart').getContext('2d');
+            chart = new Chart(ctxChart, {
+                type: 'doughnut',
+                data: {
+                    labels: ["Dubai (DXB)", "Abu Dhabi (AUH)", "Sharjah (SHJ)", "DWC / Other"],
+                    datasets: [{
+                        data: [63.5, 21.5, 13.2, 1.8],
+                        backgroundColor: ['#22d3ee', '#c084fc', '#fbbf24', '#94a3b8'],
+                        borderColor: '#0b0f19',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function updateChartData() {
+            if (!chart) return;
+
+            let dxb = 63.5, auh = 21.5, shj = 13.2, dwc = 1.8;
+
+            if (selectedRegion !== 'ALL') {
+                const reg = REGIONS.find(r => r.id === selectedRegion);
+                if (reg) {
+                    dxb = reg.shares.DXB;
+                    auh = reg.shares.AUH;
+                    shj = reg.shares.SHJ;
+                    dwc = reg.shares.DWC;
+                }
+            }
+
+            chart.data.datasets[0].data = [dxb, auh, shj, dwc];
+            chart.update();
+
+            document.getElementById('pctDXB').textContent = dxb + '%';
+            document.getElementById('pctAUH').textContent = auh + '%';
+            document.getElementById('pctSHJ').textContent = shj + '%';
+            document.getElementById('pctDWC').textContent = dwc + '%';
+
+            let baseVal = 3458;
+            if (selectedRegion !== 'ALL') {
+                const reg = REGIONS.find(r => r.id === selectedRegion);
+                if (reg) baseVal = (selectedMetric === 'pax') ? reg.pax : reg.flights;
+            } else if (selectedMetric === 'pax') {
+                baseVal = 603700;
+            }
+
+            const unit = (selectedMetric === 'pax') ? 'pax/wk' : 'fl/wk';
+            document.getElementById('valDXB').textContent = Math.round(baseVal * (dxb / 100)).toLocaleString() + ' ' + unit;
+            document.getElementById('valAUH').textContent = Math.round(baseVal * (auh / 100)).toLocaleString() + ' ' + unit;
+            document.getElementById('valSHJ').textContent = Math.round(baseVal * (shj / 100)).toLocaleString() + ' ' + unit;
+            document.getElementById('valDWC').textContent = Math.round(baseVal * (dwc / 100)).toLocaleString() + ' ' + unit;
+        }
+
+        // --- 7. FILTER & DASHBOARD STATE MANAGEMENT ---
+        function setMetricMode(mode) {
+            selectedMetric = mode;
+
+            document.getElementById('tabFlights').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+            document.getElementById('tabPax').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+            document.getElementById('tabWeight').className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+
+            if (mode === 'flights') {
+                document.getElementById('tabFlights').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-navy-950 bg-cyan-glow shadow-sm transition";
+                document.getElementById('rankingMetricLabel').textContent = "By Flight Count";
+            } else if (mode === 'pax') {
+                document.getElementById('tabPax').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-navy-950 bg-cyan-glow shadow-sm transition";
+                document.getElementById('rankingMetricLabel').textContent = "By Passenger Volume";
+            } else {
+                document.getElementById('tabWeight').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-navy-950 bg-cyan-glow shadow-sm transition";
+                document.getElementById('rankingMetricLabel').textContent = "By Hub Weight Share";
+            }
+
+            renderDashboard();
+        }
+
+        function filterRegion(regionId) {
+            selectedRegion = regionId;
+
+            document.querySelectorAll('.btn-region').forEach(btn => {
+                if (btn.getAttribute('data-region') === regionId) {
+                    btn.className = "btn-region border border-cyan-glow/50 bg-cyan-glow/20 text-cyan-glow px-3 py-1 rounded-lg text-xs font-bold transition";
+                } else {
+                    btn.className = "btn-region border border-slate-700 bg-navy-900 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-medium transition";
+                }
+            });
+
+            if (regionId === 'ALL') {
+                map.flyTo([23.5, 45.0], 3, { duration: 1 });
+                document.getElementById('chartRegionLabel').textContent = "GLOBAL";
+                document.getElementById('mapSubTitle').textContent = "Displaying 8 global regional routes into UAE Airports";
+            } else {
+                const reg = REGIONS.find(r => r.id === regionId);
+                if (reg) {
+                    map.flyTo(reg.coords, 4, { duration: 1 });
+                    document.getElementById('chartRegionLabel').textContent = reg.name.toUpperCase();
+                    document.getElementById('mapSubTitle').textContent = `Showing direct routes from ${reg.name} into UAE`;
+                }
+            }
+
+            renderDashboard();
+            drawFlightPaths();
+        }
+
+        function renderDashboard() {
+            renderKPICounters();
+            renderRegionalList();
+            updateChartData();
+        }
+
+        function renderKPICounters() {
+            let totalFlights = 0;
+            let totalPax = 0;
+
+            REGIONS.forEach(r => {
+                if (selectedRegion !== 'ALL' && selectedRegion !== r.id) return;
+                totalFlights += r.flights;
+                totalPax += r.pax;
+            });
+
+            document.getElementById('statFlights').textContent = totalFlights.toLocaleString();
+            document.getElementById('statPax').textContent = totalPax.toLocaleString();
+
+            if (selectedRegion === 'ALL') {
+                document.getElementById('statDXB').textContent = "63.5";
+                document.getElementById('statOther').textContent = "36.5";
+            } else {
+                const reg = REGIONS.find(r => r.id === selectedRegion);
+                if (reg) {
+                    document.getElementById('statDXB').textContent = reg.shares.DXB;
+                    document.getElementById('statOther').textContent = (100 - reg.shares.DXB).toFixed(1);
+                }
+            }
+        }
+
+        function renderRegionalList() {
+            const container = document.getElementById('regionalList');
+            container.innerHTML = '';
+
+            const sorted = [...REGIONS].sort((a, b) => {
+                if (selectedMetric === 'pax') return b.pax - a.pax;
+                if (selectedMetric === 'weight') return b.shares.DXB - a.shares.DXB;
+                return b.flights - a.flights;
+            });
+
+            const maxVal = (selectedMetric === 'pax') ? 149600 : 930;
+
+            sorted.forEach(region => {
+                const isSelected = (selectedRegion === region.id);
+                
+                let valDisplay = `${region.flights.toLocaleString()} <span class="text-[10px] text-slate-400">fl/wk</span>`;
+                if (selectedMetric === 'pax') {
+                    valDisplay = `${region.pax.toLocaleString()} <span class="text-[10px] text-slate-400">pax/wk</span>`;
+                } else if (selectedMetric === 'weight') {
+                    valDisplay = `${region.shares.DXB}% <span class="text-[10px] text-slate-400">DXB Share</span>`;
+                }
+
+                const currentVal = (selectedMetric === 'pax') ? region.pax : region.flights;
+                const barPct = Math.min(100, Math.round((currentVal / maxVal) * 100));
+
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-xl border transition cursor-pointer ${
+                    isSelected 
+                        ? 'bg-navy-800 border-cyan-glow/60 shadow-lg shadow-cyan-500/10' 
+                        : 'bg-navy-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-navy-800/60'
+                }`;
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-bold text-white flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${isSelected ? 'bg-cyan-glow' : 'bg-slate-600'}"></span>
+                            ${region.name}
+                        </span>
+                        <span class="font-extrabold ${isSelected ? 'text-cyan-glow' : 'text-slate-200'}">
+                            ${valDisplay}
+                        </span>
+                    </div>
+                    <div class="w-full h-1.5 bg-navy-950 rounded-full overflow-hidden mb-1.5">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-glow rounded-full" style="width: ${barPct}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400">
+                        <span>DXB: ${region.shares.DXB}% | AUH: ${region.shares.AUH}% | SHJ: ${region.shares.SHJ}%</span>
+                        <span class="text-cyan-400 hover:underline">Focus &rarr;</span>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => filterRegion(region.id));
+                container.appendChild(card);
+            });
+        }
+
+
+        // ===================================================================
+        // 8. 2026 vs 2025 YEAR-OVER-YEAR MONTHLY ANALYTICS MODAL ENGINE
+        // ===================================================================
+        
+        function openTrendModal(cardType = 'pax') {
+            currentModalCard = cardType;
+            if (cardType === 'flights') currentModalView = 'flights';
+            else if (cardType === 'pax') currentModalView = 'pax';
+            else currentModalView = 'pax';
+
+            const modal = document.getElementById('trendModal');
+            modal.classList.remove('hidden');
+
+            renderTrendModalContent();
+        }
+
+        function closeTrendModal() {
+            const modal = document.getElementById('trendModal');
+            modal.classList.add('hidden');
+
+            if (modalChart) {
+                modalChart.destroy();
+                modalChart = null;
+            }
+        }
+
+        function switchModalView(viewMode) {
+            currentModalView = viewMode;
+
+            // Toggle Tab styling inside modal
+            document.getElementById('modalTabPax').className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+            document.getElementById('modalTabFlights').className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+            document.getElementById('modalTabDelta').className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition";
+
+            if (viewMode === 'pax') {
+                document.getElementById('modalTabPax').className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-glow text-navy-950 transition";
+            } else if (viewMode === 'flights') {
+                document.getElementById('modalTabFlights').className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-glow text-navy-950 transition";
+            } else {
+                document.getElementById('modalTabDelta').className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-glow text-navy-950 transition";
+            }
+
+            renderTrendModalContent();
+        }
+
+        function renderTrendModalContent() {
+            // Determine base scale depending on selected card
+            let baseVal2025 = 560000; // 2025 pax baseline
+            let baseVal2026 = 603700; // 2026 current pax
+            let metricUnit = "pax/wk";
+
+            if (currentModalCard === 'flights' || currentModalView === 'flights') {
+                baseVal2025 = 3200;
+                baseVal2026 = 3458;
+                metricUnit = "flights/wk";
+            } else if (currentModalCard === 'dxb') {
+                baseVal2025 = 355600; // DXB Share of Pax (2025)
+                baseVal2026 = 383300; // DXB Share of Pax (2026)
+                metricUnit = "DXB pax/wk";
+            } else if (currentModalCard === 'others') {
+                baseVal2025 = 204400; // AUH/SHJ/DWC Share (2025)
+                baseVal2026 = 220400; // AUH/SHJ/DWC Share (2026)
+                metricUnit = "Other Hubs pax/wk";
+            }
+
+            // Calculate 12-month arrays for 2025 Baseline vs 2026 Current
+            const series2025 = SEASONAL_INDEX_2025.map(idx => Math.round(baseVal2025 * idx));
+            const series2026 = SEASONAL_INDEX_2026.map(idx => Math.round(baseVal2026 * idx));
+
+            // Calculate Net Variance and YoY % Delta (2026 vs 2025)
+            const netVariance = series2026.map((val, i) => val - series2025[i]);
+            const yoyDeltaPct = series2026.map((val, i) => {
+                const prev = series2025[i];
+                return parseFloat((((val - prev) / prev) * 100).toFixed(1));
+            });
+
+            // Update Summary KPI Panel
+            const avg2026 = Math.round(series2026.reduce((a, b) => a + b, 0) / 12);
+            const avg2025 = Math.round(series2025.reduce((a, b) => a + b, 0) / 12);
+            const netDiff = avg2026 - avg2025;
+            const avgYoYPct = (((avg2026 - avg2025) / avg2025) * 100).toFixed(1);
+
+            document.getElementById('mStat2026Val').textContent = `${avg2026.toLocaleString()} ${metricUnit}`;
+            document.getElementById('mStat2025Val').textContent = `${avg2025.toLocaleString()} ${metricUnit}`;
+            document.getElementById('mStatYoYNet').innerHTML = `+${netDiff.toLocaleString()} ${metricUnit} <i class="fa-solid fa-arrow-up text-xs"></i>`;
+            document.getElementById('mStatYoYPct').textContent = `+${avgYoYPct}%`;
+
+            // Render Chart.js Multi-Axis Comparison Chart
+            renderModalChart(series2025, series2026, yoyDeltaPct, metricUnit);
+
+            // Render 12-Month Comparative Table Matrix
+            renderModalTable(series2025, series2026, netVariance, yoyDeltaPct, metricUnit);
+        }
+
+        function renderModalChart(s2025, s2026, yoyDelta, metricUnit) {
+            const ctxModal = document.getElementById('modalChartCanvas').getContext('2d');
+
+            if (modalChart) {
+                modalChart.destroy();
+            }
+
+            if (currentModalView === 'delta') {
+                // YoY Variance Delta Chart (2026 vs 2025)
+                modalChart = new Chart(ctxModal, {
+                    type: 'bar',
+                    data: {
+                        labels: MONTHS,
+                        datasets: [{
+                            label: '2026 vs 2025 YoY Growth % Delta',
+                            data: yoyDelta,
+                            backgroundColor: yoyDelta.map(val => val >= 0 ? 'rgba(34, 211, 238, 0.75)' : 'rgba(244, 63, 94, 0.75)'),
+                            borderColor: yoyDelta.map(val => val >= 0 ? '#22d3ee' : '#f43f5e'),
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => ` YoY Growth: +${ctx.raw}% vs 2025`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                            y: { 
+                                grid: { color: 'rgba(255,255,255,0.05)' }, 
+                                ticks: { color: '#94a3b8', callback: (val) => val + '%' } 
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Dual Line 2026 vs 2025 Comparison
+                modalChart = new Chart(ctxModal, {
+                    type: 'line',
+                    data: {
+                        labels: MONTHS,
+                        datasets: [
+                            {
+                                label: '2026 Current Traffic',
+                                data: s2026,
+                                borderColor: '#00f2fe',
+                                backgroundColor: 'rgba(0, 242, 254, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: 4,
+                                pointHoverRadius: 7,
+                                pointBackgroundColor: '#00f2fe'
+                            },
+                            {
+                                label: '2025 Previous Year Baseline',
+                                data: s2025,
+                                borderColor: '#fbbf24',
+                                backgroundColor: 'rgba(251, 191, 36, 0.05)',
+                                borderWidth: 2,
+                                borderDash: [6, 6],
+                                fill: false,
+                                tension: 0.35,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                pointBackgroundColor: '#fbbf24'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { labels: { color: '#e2e8f0', font: { family: 'Inter', size: 11, weight: '600' } } },
+                            tooltip: {
+                                backgroundColor: 'rgba(11, 15, 25, 0.95)',
+                                titleColor: '#00f2fe',
+                                borderColor: '#1c2842',
+                                borderWidth: 1,
+                                padding: 10,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) label += ': ';
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y.toLocaleString() + ' ' + metricUnit;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } },
+                            y: { 
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                                ticks: { 
+                                    color: '#94a3b8',
+                                    callback: (val) => val >= 1000 ? (val/1000).toFixed(0) + 'k' : val
+                                } 
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderModalTable(s2025, s2026, netVar, yoyDelta, metricUnit) {
+            const tbody = document.getElementById('modalTableBody');
+            tbody.innerHTML = '';
+
+            MONTHS.forEach((month, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-navy-800/50 transition";
+
+                const val2025 = s2025[idx];
+                const val2026 = s2026[idx];
+                const diff = netVar[idx];
+                const pct = yoyDelta[idx];
+
+                const badgePct = pct >= 0 
+                    ? `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-caret-up"></i> +${pct}%</span>`
+                    : `<span class="text-rose-400 font-bold"><i class="fa-solid fa-caret-down"></i> ${pct}%</span>`;
+
+                tr.innerHTML = `
+                    <td class="p-2 font-bold text-white">${month}</td>
+                    <td class="p-2 font-mono text-amber-300/90">${val2025.toLocaleString()}</td>
+                    <td class="p-2 font-mono text-cyan-300 font-bold">${val2026.toLocaleString()}</td>
+                    <td class="p-2 font-mono text-emerald-400">+${diff.toLocaleString()}</td>
+                    <td class="p-2 text-right">${badgePct}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
