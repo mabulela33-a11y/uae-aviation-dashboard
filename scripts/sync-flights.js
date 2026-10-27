@@ -53,7 +53,7 @@ async function main() {
     method: "PATCH",
     headers: {
       apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      ...(SUPABASE_SERVICE_KEY.startsWith("eyJ") ? { Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } : {}),
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },
