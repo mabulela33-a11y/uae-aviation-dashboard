@@ -21,7 +21,6 @@ jobs:
 
       - name: Fetch Live Traffic & Update Supabase
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           AVIATIONSTACK_KEY: ${{ secrets.AVIATIONSTACK_KEY }}
         run: |
@@ -52,8 +51,8 @@ jobs:
               updated_at: new Date().toISOString()
             });
 
-            const cleanBase = process.env.SUPABASE_URL.trim().replace(/\/$/, "");
-            const fullUrl = `${cleanBase}/rest/v1/dashboard_config?metric_key=eq.total_active_flights`;
+            // Hardcoded Supabase URL to avoid environment variable resolution issues
+            const fullUrl = "https://stdxueftoewwnhbqncbo.supabase.co/rest/v1/dashboard_config?metric_key=eq.total_active_flights";
             const url = new URL(fullUrl);
             
             const options = {
